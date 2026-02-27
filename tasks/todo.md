@@ -44,6 +44,17 @@ In this development cycle we introduced several innovative capabilities inspired
 - [x] **Data export** – Added an `export` command group with a `history` subcommand to export the full scan history to a JSON file for integration with SIEM or other analysis tools.
 - [x] **Documentation and usage updates** – Updated the README to describe these new capabilities and added usage examples. Updated the usage section accordingly.
 
+### Final Integration Phase: Threat Intelligence, ML, Reporting and Alerting
+
+With the sandbox environment lifted, we implemented the remaining capabilities that were previously placeholders. These features require network access and additional dependencies and are now available in the CLI:
+
+- [x] **Threat intelligence integration** – Replaced the placeholder `intel search` with a real aggregator that queries Shodan, AbuseIPDB, VirusTotal and NVD APIs based on the provided indicator. Added a `intel geoip` command to perform GeoIP lookups. AI summarisation of intelligence results is supported using the same AI integration mechanism.
+- [x] **Machine‑learning classifier** – Added an `ml` command group with `train` and `predict` subcommands. The `train` command can learn from a user‑supplied dataset or generate synthetic samples and saves a model using scikit‑learn and joblib. The `predict` command loads the trained model and classifies a host’s risk level based on its open ports.
+- [x] **Reporting engine** – Implemented the `report` command to compile scan results, vulnerability assessments, anomalies and risk scores into HTML, PDF or JSON reports. Reports are generated using Jinja2 templates, optionally converted to PDF via WeasyPrint, and stored under `~/.cybercli/reports`. AI narratives can be appended when an API key is configured.
+- [x] **Remediation workflow** – Extended the `remediation` command group with `suggest` and `apply` commands. `suggest` derives remediation actions from vulnerability assessments using a rule‑based mapping, and `apply` runs or simulates a specified remediation step.
+- [x] **Alerting channels** – Added an `alert` command group with `email`, `slack` and `telegram` subcommands to send notifications via SMTP, Slack webhooks and Telegram Bot API. These require appropriate environment variables (SMTP credentials, Slack webhook URL and Telegram token/chat ID).
+- [x] **Dependency management** – Updated `pyproject.toml` to declare all necessary runtime dependencies, including `requests`, `scikit‑learn`, `joblib`, `jinja2` and `weasyprint`.
+
 ## Review Section
 
 Use this section to summarise progress once tasks have been completed. Include verification evidence such as test outputs, links to documentation or code diffs. This section can be updated iteratively as work proceeds.

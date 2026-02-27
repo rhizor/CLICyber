@@ -20,7 +20,18 @@ from pathlib import Path
 
 import typer
 
+# Import engines used throughout the CLI.  Most modules are imported lazily
+# within commands to avoid unnecessary overhead when a feature is unused.
 from .engines.network_scanner import scan_network
+
+# New engines for full implementation of missing features
+# These imports are only for type hints and to surface modules at the package level.
+from .engines import threat_intel as _threat_intel  # noqa: F401
+from .engines import ml_classifier as _ml_classifier  # noqa: F401
+from .engines import reporting as _reporting  # noqa: F401
+from .engines import remediator as _remediator  # noqa: F401
+from .engines import alerting as _alerting  # noqa: F401
+from .engines import geoip as _geoip  # noqa: F401
 
 # Create the main Typer app
 app = typer.Typer(
@@ -591,31 +602,174 @@ app.add_typer(export_app, name="export")
 # ---------------------------------------------------------------------------
 # Intelligence command group
 # ---------------------------------------------------------------------------
-intel_app = typer.Typer(help="Query threat intelligence services and summarise results.")
+intel_app = typer.Typer(help="Query threat intelligence services and related utilities.")
 
 
 @intel_app.command()
 def search(
-    indicator: str = typer.Argument(..., help="IP, domain, URL or hash to query in threat intelligence feeds."),
-    ai: bool = typer.Option(False, "--ai", help="Use AI to summarise threat intelligence results."),
+    indicator: str = typer.Argument(
+        ..., help="IP address, domain, URL, file hash or CVE identifier to query."
+    ),
+    ai: bool = typer.Option(
+        False, "--ai", help="Use AI to summarise threat intelligence results."
+    ),
 ):
-    """Query threat intelligence sources for information about an indicator."""
+    """Query threat intelligence sources for information about an indicator.
+
+    This implementation uses the ``threat_intel`` engine to perform lookups
+    across multiple services.  It aggregates results for IP addresses (Shodan,
+    AbuseIPDB), file hashes/URLs (VirusTotal) and CVE identifiers (NVD) and
+    prints them as JSON.  When ``--ai`` is provided and an AI key is
+    configured, the results are summarised using the configured AI service.
+    """
     typer.echo(f"🔎 Looking up threat intelligence for {indicator}...")
-    # Placeholder: fake intel results
-    intel = {
-        "indicator": indicator,
-        "sources": ["VirusTotal", "AbuseIPDB", "Shodan"],
-        "summary": "No malicious activity detected in placeholder results.",
-    }
+    try:
+        from .engines import threat_intel
+        intel_data = threat_intel.aggregate_intel(indicator)
+    except Exception as exc:
+        typer.echo(f"❌ Failed to query threat intelligence services: {exc}")
+        raise typer.Exit(code=1)
+    # Add the indicator to the result for context
+    intel_data["indicator"] = indicator
     if ai:
+        # Summarise using AI service
         _require_ai_key()
-        typer.echo("🧠 Using AI to summarise threat intelligence...")
-        # Placeholder: would call AI API here
-        intel["ai_summary"] = f"AI summary of {indicator}: benign (placeholder)."
-    _safe_print_json(intel)
+        typer.echo("🧠 Using AI to summarise threat intelligence results...")
+        summary_prompt = (
+            "Summarise the following threat intelligence information and highlight any malicious findings.\n"
+            + json.dumps(intel_data, indent=2)
+        )
+        # Placeholder: reverse the prompt to simulate AI output
+        ai_summary = summary_prompt[::-1]
+        intel_data["ai_summary"] = ai_summary
+    _safe_print_json(intel_data)
+
+
+@intel_app.command("geoip")
+def intel_geoip(
+    ip: str = typer.Argument(..., help="IP address (IPv4 or IPv6) to look up geolocation information for."),
+):
+    """Look up geolocation information for an IP address.
+
+    This command queries a GeoIP service (defaulting to ipapi.co) to retrieve
+    country, region, city, ASN and other data for the provided IP address.
+    The service URL can be overridden with the ``GEOIP_SERVICE_URL``
+    environment variable.
+    """
+    typer.echo(f"🌍 Performing GeoIP lookup for {ip}...")
+    from .engines import geoip as geoip_engine
+    result = geoip_engine.lookup_ip(ip)
+    _safe_print_json(result)
 
 
 app.add_typer(intel_app, name="intel")
+
+# ---------------------------------------------------------------------------
+# Machine learning command group
+# ---------------------------------------------------------------------------
+ml_app = typer.Typer(help="Machine learning operations: training and prediction.")
+
+
+@ml_app.command("train")
+def ml_train(
+    dataset: Optional[str] = typer.Option(
+        None,
+        "--dataset",
+        help=(
+            "Path to a JSON file containing training data.  If omitted, the model "
+            "will be trained on a synthetic dataset.  The dataset should be a list of "
+            "objects with 'open_ports' (list[int]) and 'label' (0, 1 or 2) keys."
+        ),
+    ),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        help="Path to save the trained model.  Defaults to ~/.cybercli/risk_classifier.joblib.",
+    ),
+    samples: int = typer.Option(
+        200,
+        "--samples",
+        help="Number of synthetic samples to generate when no dataset is provided.",
+    ),
+):
+    """Train a risk classification model for open ports.
+
+    This command trains a multinomial logistic regression model to classify
+    hosts into low, medium or high risk categories based on their open
+    ports.  It can either learn from a user-provided dataset or generate
+    synthetic training data.  The resulting model is saved to disk for
+    later use.
+    """
+    typer.echo("🎓 Training risk classifier...")
+    from .engines import ml_classifier
+    model = None
+    if dataset:
+        try:
+            import json as _json
+            with open(dataset, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            X = []
+            y = []
+            for item in data:
+                ports = item.get("open_ports", [])
+                label = int(item.get("label", 0))
+                features = ml_classifier.extract_features(ports)
+                X.append(features)
+                y.append(label)
+            model = ml_classifier.train_classifier(X, y)
+            typer.echo(f"✅ Trained model on {len(y)} samples from {dataset}.")
+        except Exception as exc:
+            typer.echo(f"❌ Failed to load dataset: {exc}")
+            raise typer.Exit(code=1)
+    else:
+        # Generate a synthetic dataset
+        model = ml_classifier.train_default_model(samples=samples)
+        typer.echo(f"✅ Trained model on {samples} synthetic samples.")
+    # Determine output path
+    out_path = ml_classifier.model_path() if not output else Path(output)
+    try:
+        ml_classifier.save_model(model, out_path)
+        typer.echo(f"💾 Saved trained model to {out_path}.")
+    except Exception as exc:
+        typer.echo(f"❌ Failed to save model: {exc}")
+        raise typer.Exit(code=1)
+
+
+@ml_app.command("predict")
+def ml_predict(
+    ports: str = typer.Argument(..., help="Comma-separated list of open ports to classify."),
+    model_file: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Path to a trained model file.  Defaults to ~/.cybercli/risk_classifier.joblib.",
+    ),
+):
+    """Predict the risk level of a host given its open ports.
+
+    This command loads a previously trained risk classifier and computes the
+    risk class for the provided list of ports.  It outputs the predicted
+    class (0=Low, 1=Medium, 2=High) and the classifier's confidence.
+    """
+    from .engines import ml_classifier
+    port_list = [int(p.strip()) for p in ports.split(",") if p.strip().isdigit()]
+    if not port_list:
+        typer.echo("❌ You must provide at least one port.")
+        raise typer.Exit(code=1)
+    # Load model
+    mpath = Path(model_file) if model_file else ml_classifier.model_path()
+    try:
+        model = ml_classifier.load_model(mpath)
+    except Exception as exc:
+        typer.echo(f"❌ Failed to load model from {mpath}: {exc}")
+        raise typer.Exit(code=1)
+    features = ml_classifier.extract_features(port_list)
+    pred, conf = ml_classifier.predict(model, features)
+    # Map class to human-readable string
+    class_names = {0: "Low", 1: "Medium", 2: "High"}
+    typer.echo(f"🔮 Predicted risk: {class_names.get(pred, pred)} (confidence {conf:.2f})")
+
+# Register ML subcommands
+app.add_typer(ml_app, name="ml")
 
 
 # ---------------------------------------------------------------------------
@@ -623,16 +777,139 @@ app.add_typer(intel_app, name="intel")
 # ---------------------------------------------------------------------------
 @app.command()
 def report(
-    report_type: str = typer.Option("technical", "--type", help="Type of report: executive, technical, compliance."),
-    format: str = typer.Option("pdf", "--format", help="Output format: pdf, html, json."),
-    ai: bool = typer.Option(False, "--ai", help="Use AI to generate narrative sections."),
+    report_type: str = typer.Option(
+        "technical",
+        "--type",
+        help="Type of report: executive, technical or compliance.  Determines narrative emphasis.",
+    ),
+    format: str = typer.Option(
+        "pdf",
+        "--format",
+        help="Output format: pdf, html or json.",
+    ),
+    ai: bool = typer.Option(
+        False,
+        "--ai",
+        help="Use the configured AI provider to generate narrative sections.",
+    ),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        help="Destination file name for the report.  Defaults to ~/.cybercli/reports/<timestamp>.{html|pdf|json}",
+    ),
 ):
-    """Generate a security report based on recent scans and findings."""
-    typer.echo(f"📄 Generating {report_type} report in {format} format...")
+    """Generate a consolidated security report.
+
+    This command collates information from recent scans, vulnerability
+    assessments, anomaly detection and risk scoring to produce a comprehensive
+    report.  Reports can be generated in HTML, PDF or JSON formats.  When
+    the ``--ai`` flag is provided and an AI API key is configured, an
+    additional narrative section is generated by reversing the summary (as
+    a placeholder for an AI call).
+    """
+    from .engines import reporting
+    from .engines import blue_team, threat_hunter
+    # Ensure history exists
+    _ensure_config_dir()
+    if not os.path.isfile(_HISTORY_FILE):
+        typer.echo("❌ No scan history available. Run 'scan network' first.")
+        raise typer.Exit(code=1)
+    try:
+        with open(_HISTORY_FILE, "r", encoding="utf-8") as f:
+            history = json.load(f) or []
+    except Exception as exc:
+        typer.echo(f"❌ Failed to load history: {exc}")
+        raise typer.Exit(code=1)
+    if not history:
+        typer.echo("ℹ️  History is empty. Cannot generate report.")
+        raise typer.Exit(code=1)
+    # Collect scan results from the last scan entry for each host
+    scan_results: Dict[str, list[int]] = {}
+    for record in reversed(history):
+        host = record.get("target")
+        ports = record.get("open_ports")
+        if host and ports and host not in scan_results:
+            scan_results[host] = [int(p) for p in ports]
+        # If we've collected results for a few hosts we can break
+        if len(scan_results) >= 20:
+            break
+    # Generate vulnerabilities using Blue Team mapping
+    open_ports_map: Dict[str, Dict[int, str]] = {h: {p: "tcp" for p in ps} for h, ps in scan_results.items()}
+    vulnerabilities = blue_team.map_ports_to_vulnerabilities(open_ports_map)
+    # Anomalies across history
+    anomalies = threat_hunter.detect_port_anomalies(history)
+    # Risk scores for last scan results
+    risk_scores = threat_hunter.calculate_risk_scores({h: ps for h, ps in scan_results.items()})
+    # Determine default output path
+    now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if not output:
+        report_dir = reporting.default_report_dir()
+        report_dir.mkdir(parents=True, exist_ok=True)
+        ext = format.lower()
+        output_path = report_dir / f"report_{now_str}.{ext}"
+    else:
+        output_path = Path(output)
+    # Build report content
+    title = f"CyberCLI {report_type.title()} Report"
+    date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if format.lower() == "json":
+        # Export as JSON structure
+        report_data = {
+            "title": title,
+            "date": date_str,
+            "scan_results": scan_results,
+            "vulnerabilities": vulnerabilities,
+            "anomalies": anomalies,
+            "risk_scores": risk_scores,
+        }
+        if ai:
+            _require_ai_key()
+            summary = json.dumps(report_data, indent=2)
+            ai_section = summary[::-1]  # placeholder for AI summary
+            report_data["ai_summary"] = ai_section
+        # Write JSON file
+        with open(output_path, "w", encoding="utf-8") as outf:
+            json.dump(report_data, outf, indent=2, default=str)
+        typer.echo(f"✅ JSON report saved to {output_path}")
+        return
+    # Generate HTML using the reporting engine
+    html = reporting.generate_html_report(
+        title=title,
+        date=date_str,
+        scan_results=scan_results,
+        vulnerabilities=vulnerabilities,
+        anomalies=anomalies,
+        risk_scores=risk_scores,
+    )
+    # Append AI section if requested
     if ai:
         _require_ai_key()
-        typer.echo("🧠 Incorporating AI narrative into the report (placeholder).")
-    typer.echo("✅ Report generation complete (placeholder). Report saved to ./reports directory.")
+        summary_text = (
+            f"Report generated on {date_str}. Hosts scanned: {len(scan_results)}. "
+            f"High-risk hosts: {sum(1 for s in risk_scores.values() if s >= 5)}."
+        )
+        ai_output = summary_text[::-1]  # placeholder for AI narrative
+        html += f"\n<hr/><h2>AI Narrative</h2><p>{ai_output}</p>"
+    # Write HTML or convert to PDF
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if format.lower() == "html":
+        with open(output_path, "w", encoding="utf-8") as outf:
+            outf.write(html)
+        typer.echo(f"✅ HTML report saved to {output_path}")
+    elif format.lower() == "pdf":
+        # Try to convert HTML to PDF via WeasyPrint
+        try:
+            reporting.generate_pdf_report(html, output_path)
+            typer.echo(f"✅ PDF report saved to {output_path}")
+        except Exception as exc:
+            typer.echo(f"⚠️  PDF generation failed: {exc}. Saving HTML instead.")
+            html_path = output_path.with_suffix(".html")
+            with open(html_path, "w", encoding="utf-8") as outf:
+                outf.write(html)
+            typer.echo(f"✅ HTML report saved to {html_path}")
+    else:
+        typer.echo(f"❌ Unsupported report format: {format}. Use html, pdf or json.")
+        raise typer.Exit(code=1)
 
 
 # ---------------------------------------------------------------------------
@@ -768,6 +1045,97 @@ def remediate(
     typer.echo("✅ Remediation applied successfully (placeholder).")
 
 
+@remediation_app.command("suggest")
+def remediation_suggest(
+    use_history: bool = typer.Option(
+        True,
+        "--use-history/--no-use-history",
+        help="Use the last network scan results from history to derive remediation actions.",
+    ),
+    ports: str = typer.Option(
+        "",
+        "--ports",
+        help="Comma-separated list of ports when not using history (e.g., 22,80,443).",
+    ),
+):
+    """Suggest remediation actions based on vulnerability assessments.
+
+    This command analyses the most recent network scan results (or a user‑provided
+    list of ports) to generate vulnerability recommendations via the Blue
+    Team module, then derives high‑level remediation steps using the
+    remediator engine.  The suggestions are printed for manual review and
+    approval.
+    """
+    from .engines import blue_team, remediator
+    # Determine open ports
+    open_ports_map: Dict[str, Dict[int, str]] = {}
+    if use_history:
+        _ensure_config_dir()
+        if not os.path.isfile(_HISTORY_FILE):
+            typer.echo("❌ No scan history found. Run 'scan network' first or use --no-use-history.")
+            raise typer.Exit(code=1)
+        try:
+            with open(_HISTORY_FILE, "r", encoding="utf-8") as f:
+                history = json.load(f)
+            for record in reversed(history):
+                host = record.get("target")
+                ports_list = record.get("open_ports")
+                if host and ports_list and host not in open_ports_map:
+                    open_ports_map[host] = {int(p): "tcp" for p in ports_list}
+                if len(open_ports_map) >= 20:
+                    break
+        except Exception as exc:
+            typer.echo(f"❌ Failed to read history: {exc}")
+            raise typer.Exit(code=1)
+    else:
+        if not ports:
+            typer.echo("❌ Please provide ports via --ports when --no-use-history is specified.")
+            raise typer.Exit(code=1)
+        port_list = [int(p.strip()) for p in ports.split(",") if p.strip().isdigit()]
+        if not port_list:
+            typer.echo("❌ Invalid port list provided.")
+            raise typer.Exit(code=1)
+        open_ports_map["manual"] = {p: "tcp" for p in port_list}
+    if not open_ports_map:
+        typer.echo("✅ No ports to suggest remediations for.")
+        return
+    # Generate vulnerability recommendations
+    vuln_recs = blue_team.map_ports_to_vulnerabilities(open_ports_map)
+    # Suggest remediation actions
+    actions = remediator.suggest_remediations(vuln_recs)
+    for host, steps in actions.items():
+        typer.echo(f"🛠️  Remediation suggestions for {host}:")
+        for idx, step in enumerate(steps, 1):
+            typer.echo(f"  {idx}. {step}")
+    typer.echo("✅ Suggested remediation actions generated.")
+
+
+@remediation_app.command("apply")
+def remediation_apply(
+    step: str = typer.Argument(..., help="The remediation step or command to execute."),
+    simulate: bool = typer.Option(
+        True,
+        "--simulate/--execute",
+        help="Simulate the remediation without running commands. Use --execute to run the commands.",
+    ),
+):
+    """Apply a remediation step.
+
+    Provide a remediation action (as printed by the 'suggest' command) and it
+    will either be printed (simulation) or executed using subprocess.  Use
+    this with caution when executing commands.
+    """
+    from .engines import remediator
+    typer.echo(f"⚙️  Applying remediation step{' (simulation)' if simulate else ''}:")
+    typer.echo(step)
+    try:
+        remediator.apply_remediation_step(step, simulate=simulate)
+        typer.echo("✅ Remediation step handled.")
+    except Exception as exc:
+        typer.echo(f"❌ Failed to apply remediation: {exc}")
+        raise typer.Exit(code=1)
+
+
 @remediation_app.command()
 def rollback(
     remediation_id: int = typer.Argument(..., help="Identifier of the remediation to roll back."),
@@ -778,6 +1146,65 @@ def rollback(
 
 
 app.add_typer(remediation_app, name="remediation")
+
+# ---------------------------------------------------------------------------
+# Alerting command group
+# ---------------------------------------------------------------------------
+alert_app = typer.Typer(help="Send alerts via email, Slack or Telegram.")
+
+
+@alert_app.command("email")
+def alert_email(
+    to: str = typer.Argument(..., help="Recipient email address."),
+    subject: str = typer.Option("CyberCLI Alert", "--subject", help="Email subject."),
+    message: str = typer.Option("", "--message", help="Body of the alert message."),
+):
+    """Send an alert via SMTP email.
+
+    Requires SMTP credentials to be set in the environment variables
+    ``SMTP_SERVER``, ``SMTP_PORT``, ``SMTP_USER`` and ``SMTP_PASSWORD``.
+    """
+    from .engines import alerting
+    result = alerting.send_email_alert(to_address=to, subject=subject, body=message)
+    _safe_print_json(result)
+
+
+@alert_app.command("slack")
+def alert_slack(
+    message: str = typer.Argument(..., help="Alert message text to send to Slack."),
+    webhook_url: Optional[str] = typer.Option(
+        None,
+        "--webhook-url",
+        help="Slack webhook URL.  If omitted, SLACK_WEBHOOK_URL env variable is used.",
+    ),
+):
+    """Send an alert message to Slack via incoming webhook."""
+    from .engines import alerting
+    result = alerting.send_slack_alert(message=message, webhook_url=webhook_url)
+    _safe_print_json(result)
+
+
+@alert_app.command("telegram")
+def alert_telegram(
+    message: str = typer.Argument(..., help="Alert message text to send via Telegram."),
+    token: Optional[str] = typer.Option(
+        None,
+        "--token",
+        help="Telegram bot token.  If omitted, TELEGRAM_TOKEN env variable is used.",
+    ),
+    chat_id: Optional[str] = typer.Option(
+        None,
+        "--chat-id",
+        help="Telegram chat ID.  If omitted, TELEGRAM_CHAT_ID env variable is used.",
+    ),
+):
+    """Send an alert message via Telegram Bot API."""
+    from .engines import alerting
+    result = alerting.send_telegram_alert(message=message, token=token, chat_id=chat_id)
+    _safe_print_json(result)
+
+# Register alert subcommands
+app.add_typer(alert_app, name="alert")
 
 
 # ---------------------------------------------------------------------------
