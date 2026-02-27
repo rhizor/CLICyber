@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Project metadata for packaging. The main package is cybercli, which provides
+# an interactive CLI for security operations inspired by the CyberAgent project.
+
+[project]
+name = "cybercli"
+version = "0.1.0"
+description = "Interactive CLI for CyberAgent-inspired security operations with ISO 27001 compliance checks"
+requires-python = ">=3.8"
+authors = [ { name = "CyberAgent CLI Team", email = "info@example.com" } ]
+license = { text = "MIT" }
+readme = "README.md"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["cybercli"]
