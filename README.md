@@ -84,6 +84,17 @@ pytest  # run the test suite
   labs and destroy them when no longer needed.
 – **Self‑learning mechanism:** record scan results and analyse them to
   identify frequently open ports; use AI to recommend remediation steps.
+– **CVE Monitoring:** query NVD and CIRCL CVE databases, search by CVE ID,
+  keyword, or product, view recent vulnerabilities with severity ratings.
+– **Container Security:** scan Docker containers and Kubernetes clusters for
+  security issues including privilege escalation, exposed sensitive ports,
+  insecure image tags, and RBAC misconfigurations.
+– **File Integrity Monitoring (FIM):** create baselines, monitor files for
+  changes, detect modifications, deletions, and permission changes.
+– **SIEM Integration:** send events to Splunk (HEC), Elasticsearch/ELK,
+  Syslog (UDP/TCP), and custom webhooks.
+– **REST API:** FastAPI-based REST API server for programmatic access to
+  all CLI features.
 
 ## Usage
 
@@ -107,6 +118,28 @@ python -m cybercli blue auth-analysis /var/log/auth.log --start-hour 0 --end-hou
 python -m cybercli hunt anomalies                 # find changes in open ports across scans
 python -m cybercli hunt risk-scores              # calculate risk scores for hosts based on last scan
 python -m cybercli export history history.json   # export scan history to a JSON file for SIEM integration
+
+# CVE Monitoring
+python -m cybercli.cli cve search CVE-2024-1234 --detailed  # search specific CVE
+python -m cybercli.cli cve recent --days 7 --limit 10        # recent CVEs
+python -m cybercli.cli cve product nginx --vendor apache    # CVEs by product
+
+# Container Security
+python -m cybercli.cli container docker      # scan Docker containers
+python -m cybercli.cli container kubernetes  # scan K8s cluster
+
+# File Integrity Monitoring
+python -m cybercli.cli fim create-baseline /etc --recursive  # create baseline
+python -m cybercli.cli fim check                                   # check integrity
+python -m cybercli.cli fim monitor /var/www --interval 30        # continuous monitoring
+python -m cybercli.cli fim list                                    # list baseline
+
+# SIEM Integration
+python -m cybercli.cli siem send splunk "Test alert" --host splunk.example.com
+python -m cybercli.cli siem test elk --host elk.example.com:9200
+
+# REST API Server
+python -m cybercli.cli api --host 0.0.0.0 --port 8000
 ```
 
 ## Environment Variables
@@ -116,6 +149,13 @@ python -m cybercli export history history.json   # export scan history to a JSON
 | `CYBERCLI_AI_API_KEY` | API key for AI features (Gemini, OpenAI) |
 | `SHODAN_API_KEY` | Shodan API for threat intelligence |
 | `ABUSEIPDB_API_KEY` | AbuseIPDB for IP reputation |
+| `VIRUSTOTAL_API_KEY` | VirusTotal for malware scanning |
+| `NVD_API_KEY` | National Vulnerability Database API key |
+| `SPLUNK_HEC_TOKEN` | Splunk HTTP Event Collector token |
+| `SPLUNK_USERNAME` | Splunk username |
+| `SPLUNK_PASSWORD` | Splunk password |
+| `ELASTIC_HOST` | Elasticsearch host (default: localhost:9200) |
+| `ELASTIC_API_KEY` | Elasticsearch API key |
 | `SMTP_SERVER` | SMTP server for email alerts |
 | `SMTP_PORT` | SMTP port (default: 587) |
 | `SMTP_USER` | SMTP username |
