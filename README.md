@@ -1,4 +1,4 @@
-# cybercli
+# cybercli 🛡️
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python">
@@ -6,165 +6,270 @@
   <img src="https://img.shields.io/badge/Tests-17%2F17-success-green.svg" alt="Tests">
 </p>
 
-`cybercli` provides an interactive command‑line interface modelled on the CyberAgent platform.  
-It allows users of varying skill levels to perform network scans, query threat intelligence sources,
-generate reports, check compliance against ISO&nbsp;27001 controls, create CTF laboratories, and
-leverage AI models (such as Gemini or OpenAI) to summarise findings and propose remediation steps.
+> CLI de seguridad inspirada en CyberAgent para escaneos de red, threat intelligence, compliance ISO 27001 y más.
 
-## ⚠️ Security Features
+## 📖 Descripción
 
-This project includes security-hardened code:
-- **Command Blocklisting**: Dangerous commands (rm -rf, fork bombs, etc.) are blocked in remediation
-- **SSL/TLS Verification**: All HTTP requests verify SSL certificates by default
-- **Timeout Protection**: Commands execute with 30-second timeout to prevent hangs
-- **Audit Logging**: All remediation attempts are logged
+`cybercli` es una interfaz de línea de comandos interactiva diseñada para operaciones de seguridad. Permite a usuarios de diferentes niveles realizar escaneos de red, consultar fuentes de inteligencia de amenazas, generar reportes, verificar cumplimiento con ISO 27001, crear laboratorios CTF y aprovechar modelos de IA para resumir hallazgos y proponer pasos de remediación.
 
-## Installation
+## ⚠️ Características de Seguridad
 
-Install in editable mode within a Python ≥ 3.8 environment:
+Este proyecto incluye código fortalecido para seguridad:
+- **Bloqueo de Comandos Peligrosos**: Comandos como `rm -rf`, fork bombs, etc. son bloqueados en remediaciones
+- **Verificación SSL/TLS**: Todas las peticiones HTTP verifican certificados SSL por defecto
+- **Protección de Timeout**: Comandos se ejecutan con timeout de 30 segundos para evitar bloqueos
+- **Log de Auditoría**: Todos los intentos de remediación son registrados
+
+## 🚀 Instalación
+
+### Requisitos Previos
+
+- Python 3.8+
+- pip
+- Git
+
+### Instalación con Entorno Virtual (Recomendado)
 
 ```bash
+# Clonar repositorio
+git clone https://github.com/rhizor/CLICyber.git
+cd CLICyber
+
+# Crear entorno virtual (recomendado)
+python3 -m venv venv
+
+# Activar entorno virtual
+source venv/bin/activate  # Linux/macOS
+# En Windows:
+# venv\Scripts\activate
+
+# Instalar en modo editable
+pip install -e .
+
+# O instalar solo dependencias
+pip install -r requirements.txt
+```
+
+### Instalación Global
+
+```bash
+git clone https://github.com/rhizor/CLICyber.git
+cd CLICyber
 pip install -e .
 ```
 
-If your environment lacks build tools, you can still run the CLI by adding the project
-root to your ``PYTHONPATH``:
+> ⚠️ **Nota**: Se recomienda usar un entorno virtual (`venv`) para evitar conflictos con otras dependencias del sistema.
+
+### Verificar Instalación
 
 ```bash
-export PYTHONPATH="$(pwd)"  # from the repository root
-pytest  # run the test suite
+# Verificar que está instalado
+cybercli --help
+
+# O usar como módulo
+python3 -m cybercli --help
 ```
 
-## Features
+## 📦 Características
 
-– **Network scans:** perform real asynchronous port scans over IPv4 ranges using
-  Python’s socket library. Users can specify the number of top ports to scan
-  or define custom port lists via scan profiles. Results are recorded for
-  self‑learning and later analysis.
-– **Malware scanning:** compute SHA256 hashes for files within a given path and
-  compare them against a user‑supplied database of known malicious hashes.
-  Results identify which files match known malware signatures.
-– **System hardening checks:** evaluate common security settings including
-  SSH root login (`PermitRootLogin no`), password complexity (minimum
-  length and rotation), and host firewall status. Each check includes
-  remediation recommendations.
-– **Blue Team operations:** assess vulnerabilities based on open ports (e.g.,
-  recommending TLS enforcement on port 80/443) and perform log analysis to
-  detect repeated failed login attempts across IP addresses.
-– **Red Team operations:** safely exploit CTF labs created by the tool by
-  reading flags within challenge directories. In real deployments this can be
-  extended to run actual exploitation scripts.
-– **Threat hunting and anomaly detection:** analiza los datos históricos de los
-  escaneos para detectar cambios de puertos entre escaneos y calcular
-  puntuaciones de riesgo por host. Esto ayuda a priorizar los equipos que
-  exponen servicios de alto riesgo e identifica cambios inesperados en la
-  superficie de ataque.
-– **Authentication analysis:** parse authentication logs to flag logins outside
-  normal working hours and summarise failed login attempts per source. This
-  supports monitoring for compromised accounts and brute‑force attacks.
-– **Dynamic CTF labs:** optionally generate a vulnerable web service challenge
-  with a simple Python HTTP server that reflects user input, enabling users to
-  practise exploiting cross‑site scripting (XSS) vulnerabilities.
-– **Data export:** export scan history to JSON for integration with SIEM or
-  other analysis tools.
-– **Threat intelligence queries:** gather basic threat‑intel data for IPs,
-  domains or hashes; optionally summarise results with AI assistance.
-– **Reporting:** generate technical, executive or compliance reports in PDF,
-  HTML or JSON formats with optional AI‑generated narrative sections.
-– **ISO 27001 compliance check:** evaluate your implementation of the four
-  control themes (organizational, people, physical and technological) defined in
-  ISO 27001:2022【545426540923872†L61-L71】. Supports interactive prompts or
-  reading from a JSON/YAML file and can provide AI‑driven recommendations.
-– **Remediation and rollback:** simulate remediation actions on identified
-  findings and support rolling back changes.
-– **Scan profiles and scheduling:** save custom port profiles, reuse them on
-  demand and schedule recurring scans using cron expressions stored locally.
-– **CTF lab automation:** provision Capture‑The‑Flag training labs under
-  ``~/.cybercli/labs`` with configurable numbers of challenges, list existing
-  labs and destroy them when no longer needed.
-– **Self‑learning mechanism:** record scan results and analyse them to
-  identify frequently open ports; use AI to recommend remediation steps.
-– **CVE Monitoring:** query NVD and CIRCL CVE databases, search by CVE ID,
-  keyword, or product, view recent vulnerabilities with severity ratings.
-– **Container Security:** scan Docker containers and Kubernetes clusters for
-  security issues including privilege escalation, exposed sensitive ports,
-  insecure image tags, and RBAC misconfigurations.
-– **File Integrity Monitoring (FIM):** create baselines, monitor files for
-  changes, detect modifications, deletions, and permission changes.
-– **SIEM Integration:** send events to Splunk (HEC), Elasticsearch/ELK,
-  Syslog (UDP/TCP), and custom webhooks.
-– **REST API:** FastAPI-based REST API server for programmatic access to
-  all CLI features.
+### Escaneo y Redes
+- **Escaneo de red**: Escaneos asíncronos de puertos sobre rangos IPv4 usando socket library de Python
+- **Perfiles de escaneo**: Guardar y reusing perfiles de puertos personalizados
+- **Programación**: Programar escaneos recurrentes usando expresiones cron
 
-## Usage
+### Análisis de Seguridad
+- **Escaneo de malware**: Calcular hashes SHA256 y comparar contra base de datos de hashes maliciosos
+- **Hardening del sistema**: Verificar configuraciones de seguridad (SSH, passwords, firewall)
+- **Análisis Blue Team**: Evaluar vulnerabilidades basadas en puertos abiertos y análisis de logs
+- **Análisis de autenticación**: Detectar logins fuera de horario normal
 
-Invoke the CLI as follows:
+### Threat Intelligence
+- **CVE Monitoring**: Consultar bases de datos NVD y CIRCL
+- **Threat Intel**: Consultar Shodan, AbuseIPDB, VirusTotal (requiere API keys)
+- **Caza de amenazas**: Detectar anomalías en datos históricos de escaneos
+
+### Compliance y Reportes
+- **ISO 27001**: Verificar implementación de controles de ISO 27001:2022
+- **Reportes**: Generar reportes técnicos, ejecutivos o de compliance en PDF, HTML o JSON
+- **Export**: Exportar historial a JSON para integración con SIEM
+
+### Contenedores e Integridad
+- **Seguridad de Contenedores**: Escanear Docker y Kubernetes
+- **File Integrity Monitoring (FIM)**: Monitorear cambios en archivos
+
+### SIEM y API
+- **Integración SIEM**: Enviar eventos a Splunk, ELK, Syslog
+- **REST API**: Servidor FastAPI para acceso programático
+
+### Labs y Educación
+- **Laboratorios CTF**: Crear entornos de práctica CTF
+- **Red Team**: Simular explotación segura de labs
+- **Self-Learning**: Análisis de historial para identificar patrones
+
+## 💻 Uso
+
+### Comandos Básicos
 
 ```bash
-python -m cybercli --help           # list top-level commands
-python -m cybercli scan network 10.0.0.0/24 --top-ports 50
-python -m cybercli scan save-profile web --ports 80,443 --description "Web services"
-python -m cybercli scan run-profile web 10.0.0.0/24
-python -m cybercli schedule add weekly-scan 10.0.0.0/24 --cron "0 0 * * 0" --profile web
-python -m cybercli compliance --ai               # interactive compliance check with AI advice
-python -m cybercli ctf create mylab --challenges 3
-python -m cybercli learn --ai                    # analyse history and get AI recommendations
-python -m cybercli scan malware /var/www --signature-db signatures.json  # scan directory for malware
-python -m cybercli scan hardening                # evaluate system hardening
-python -m cybercli blue vuln-scan                # generate vulnerability recommendations from last scan
-python -m cybercli blue log-analysis /var/log/auth.log  # detect failed login attempts
-python -m cybercli red exploit-lab mylab         # simulate exploitation of a CTF lab
-python -m cybercli blue auth-analysis /var/log/auth.log --start-hour 0 --end-hour 6  # detect logins outside midnight-6am
-python -m cybercli hunt anomalies                 # find changes in open ports across scans
-python -m cybercli hunt risk-scores              # calculate risk scores for hosts based on last scan
-python -m cybercli export history history.json   # export scan history to a JSON file for SIEM integration
+# Ayuda general
+python3 -m cybercli --help
 
-# CVE Monitoring
-python -m cybercli.cli cve search CVE-2024-1234 --detailed  # search specific CVE
-python -m cybercli.cli cve recent --days 7 --limit 10        # recent CVEs
-python -m cybercli.cli cve product nginx --vendor apache    # CVEs by product
+# Escaneo de red
+python3 -m cybercli scan network 10.0.0.0/24 --top-ports 50
 
-# Container Security
-python -m cybercli.cli container docker      # scan Docker containers
-python -m cybercli.cli container kubernetes  # scan K8s cluster
+# Perfiles de escaneo
+python3 -m cybercli scan save-profile web --ports 80,443 --description "Web services"
+python3 -m cybercli scan run-profile web 10.0.0.0/24
 
-# File Integrity Monitoring
-python -m cybercli.cli fim create-baseline /etc --recursive  # create baseline
-python -m cybercli.cli fim check                                   # check integrity
-python -m cybercli.cli fim monitor /var/www --interval 30        # continuous monitoring
-python -m cybercli.cli fim list                                    # list baseline
-
-# SIEM Integration
-python -m cybercli.cli siem send splunk "Test alert" --host splunk.example.com
-python -m cybercli.cli siem test elk --host elk.example.com:9200
-
-# REST API Server
-python -m cybercli.cli api --host 0.0.0.0 --port 8000
+# Programar escaneos
+python3 -m cybercli schedule add weekly-scan 10.0.0.0/24 --cron "0 0 * * 0" --profile web
 ```
 
-## Environment Variables
+### Blue/Red Team
 
-| Variable | Description |
+```bash
+# Escaneo de hardening
+python3 -m cybercli scan hardening
+
+# Análisis de vulnerabilidades
+python3 -m cybercli blue vuln-scan
+
+# Análisis de logs
+python3 -m cybercli blue log-analysis /var/log/auth.log
+
+# Análisis de autenticación
+python3 -m cybercli blue auth-analysis /var/log/auth.log --start-hour 0 --end-hour 6
+
+# Explotar lab CTF
+python3 -m cybercli red exploit-lab mylab
+```
+
+### Threat Intelligence
+
+```bash
+# Buscar CVE específico
+python3 -m cybercli.cli cve search CVE-2024-1234 --detailed
+
+# CVEs recientes
+python3 -m cybercli.cli cve recent --days 7 --limit 10
+
+# CVEs por producto
+python3 -m cybercli.cli cve product nginx --vendor apache
+```
+
+### Contenedores
+
+```bash
+# Escanear Docker
+python3 -m cybercli.cli container docker
+
+# Escanear Kubernetes
+python3 -m cybercli.cli container kubernetes
+```
+
+### File Integrity
+
+```bash
+# Crear baseline
+python3 -m cybercli.cli fim create-baseline /etc --recursive
+
+# Verificar integridad
+python3 -m cybercli.cli fim check
+
+# Monitoreo continuo
+python3 -m cybercli.cli fim monitor /var/www --interval 30
+```
+
+### SIEM
+
+```bash
+# Enviar a Splunk
+python3 -m cybercli.cli siem send splunk "Test alert" --host splunk.example.com
+
+# Probar conexión ELK
+python3 -m cybercli.cli siem test elk --host elk.example.com:9200
+```
+
+### API REST
+
+```bash
+# Iniciar servidor API
+python3 -m cybercli.cli api --host 0.0.0.0 --port 8000
+```
+
+## ⚙️ Variables de Entorno
+
+| Variable | Descripción |
 |----------|-------------|
-| `CYBERCLI_AI_API_KEY` | API key for AI features (Gemini, OpenAI) |
-| `SHODAN_API_KEY` | Shodan API for threat intelligence |
-| `ABUSEIPDB_API_KEY` | AbuseIPDB for IP reputation |
-| `VIRUSTOTAL_API_KEY` | VirusTotal for malware scanning |
-| `NVD_API_KEY` | National Vulnerability Database API key |
-| `SPLUNK_HEC_TOKEN` | Splunk HTTP Event Collector token |
-| `SPLUNK_USERNAME` | Splunk username |
-| `SPLUNK_PASSWORD` | Splunk password |
-| `ELASTIC_HOST` | Elasticsearch host (default: localhost:9200) |
-| `ELASTIC_API_KEY` | Elasticsearch API key |
-| `SMTP_SERVER` | SMTP server for email alerts |
-| `SMTP_PORT` | SMTP port (default: 587) |
-| `SMTP_USER` | SMTP username |
-| `SMTP_PASSWORD` | SMTP password |
-| `SLACK_WEBHOOK_URL` | Slack webhook for alerts |
-| `TELEGRAM_TOKEN` | Telegram bot token |
-| `TELEGRAM_CHAT_ID` | Telegram chat ID |
+| `CYBERCLI_AI_API_KEY` | API key para funciones de IA (Gemini, OpenAI) |
+| `SHODAN_API_KEY` | API de Shodan para threat intelligence |
+| `ABUSEIPDB_API_KEY` | AbuseIPDB para reputación de IPs |
+| `VIRUSTOTAL_API_KEY` | VirusTotal para escaneo de malware |
+| `NVD_API_KEY` | API del National Vulnerability Database |
+| `SPLUNK_HEC_TOKEN` | Token de Splunk HEC |
+| `SPLUNK_USERNAME` | Usuario de Splunk |
+| `SPLUNK_PASSWORD` | Password de Splunk |
+| `ELASTIC_HOST` | Host de Elasticsearch (default: localhost:9200) |
+| `ELASTIC_API_KEY` | API key de Elasticsearch |
+| `SMTP_SERVER` | Servidor SMTP para emails |
+| `SMTP_PORT` | Puerto SMTP (default: 587) |
+| `SMTP_USER` | Usuario SMTP |
+| `SMTP_PASSWORD` | Password SMTP |
+| `SLACK_WEBHOOK_URL` | Webhook de Slack para alertas |
+| `TELEGRAM_TOKEN` | Token del bot de Telegram |
+| `TELEGRAM_CHAT_ID` | Chat ID de Telegram |
 
-Configure an AI provider by setting ``CYBERCLI_AI_API_KEY`` in your environment.
-Currently the AI integration uses a placeholder; integrate with Gemini or OpenAI
-SDKs in a full deployment. See the source code for details on extending the
-interfaces.
+## 🧪 Testing
+
+```bash
+# Ejecutar todos los tests
+pytest
+
+# Ejecutar con coverage
+pytest --cov=cybercli
+
+# Ejecutar tests específicos
+pytest tests/test_cli.py -v
+```
+
+## 📁 Estructura del Proyecto
+
+```
+CLICyber/
+├── cybercli/
+│   ├── __init__.py
+│   ├── cli.py              # CLI principal
+│   ├── api.py              # Servidor REST API
+│   └── engines/            # Módulos de funcionalidad
+│       ├── network_scanner.py
+│       ├── malware_scanner.py
+│       ├── hardening_checker.py
+│       ├── threat_intel.py
+│       ├── cve_monitor.py
+│       ├── container_security.py
+│       ├── file_integrity.py
+│       ├── siem_integration.py
+│       └── ...
+├── tests/                  # Tests unitarios
+├── docs/                  # Documentación
+├── pyproject.toml
+└── README.md
+```
+
+## 🤝 Contribuir
+
+1. Fork el proyecto
+2. Crear una rama (`git checkout -b feature/nueva-caracteristica`)
+3. Commitear cambios (`git commit -am 'Agregar nueva característica'`)
+4. Pushear (`git push origin feature/nueva-caracteristica`)
+5. Crear Pull Request
+
+## 📜 Licencia
+
+MIT License - ver LICENSE para detalles.
+
+---
+
+<p align="center">
+  <i>"La herramienta perfecta para el keamanan profesional"</i>
+</p>
