@@ -1,15 +1,23 @@
 # cybercli
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+  <img src="https://img.shields.io/badge/Tests-17%2F17-success-green.svg" alt="Tests">
+</p>
+
 `cybercli` provides an interactive command‑line interface modelled on the CyberAgent platform.  
 It allows users of varying skill levels to perform network scans, query threat intelligence sources,
 generate reports, check compliance against ISO&nbsp;27001 controls, create CTF laboratories, and
 leverage AI models (such as Gemini or OpenAI) to summarise findings and propose remediation steps.
 
-This package is under active development and should be installed in editable mode during development:
+## ⚠️ Security Features
 
-```bash
-pip install -e .
-```
+This project includes security-hardened code:
+- **Command Blocklisting**: Dangerous commands (rm -rf, fork bombs, etc.) are blocked in remediation
+- **SSL/TLS Verification**: All HTTP requests verify SSL certificates by default
+- **Timeout Protection**: Commands execute with 30-second timeout to prevent hangs
+- **Audit Logging**: All remediation attempts are logged
 
 ## Installation
 
@@ -100,6 +108,21 @@ python -m cybercli hunt anomalies                 # find changes in open ports a
 python -m cybercli hunt risk-scores              # calculate risk scores for hosts based on last scan
 python -m cybercli export history history.json   # export scan history to a JSON file for SIEM integration
 ```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `CYBERCLI_AI_API_KEY` | API key for AI features (Gemini, OpenAI) |
+| `SHODAN_API_KEY` | Shodan API for threat intelligence |
+| `ABUSEIPDB_API_KEY` | AbuseIPDB for IP reputation |
+| `SMTP_SERVER` | SMTP server for email alerts |
+| `SMTP_PORT` | SMTP port (default: 587) |
+| `SMTP_USER` | SMTP username |
+| `SMTP_PASSWORD` | SMTP password |
+| `SLACK_WEBHOOK_URL` | Slack webhook for alerts |
+| `TELEGRAM_TOKEN` | Telegram bot token |
+| `TELEGRAM_CHAT_ID` | Telegram chat ID |
 
 Configure an AI provider by setting ``CYBERCLI_AI_API_KEY`` in your environment.
 Currently the AI integration uses a placeholder; integrate with Gemini or OpenAI

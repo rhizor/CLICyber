@@ -20,7 +20,42 @@ The module exposes two primary functions:
 from __future__ import annotations
 
 import subprocess
-from typing import Dict, List
+import re
+import logging
+from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+# Patterns of dangerous commands that should NEVER be executed
+BLOCKED_PATTERNS = [
+    r"rm\s+-rf", r"rm\s+-r\s+/", r"rm\s+-R", r"rm\s+-f\s+/",
+    r"dd\s+if=", r"dd\s+of=", r">\s*/dev/", r"mkfs",
+    r"chmod\s+777", r"chown\s+-R", r"chmod\s+-R\s+777",
+    r"wget\s+.*\|", r"curl\s+.*\|", r"python.*\|",
+    r";\s*rm", r"&&\s*rm", r"\|\s*rm", r";\s*fork",
+    r"fork\(\)", r":\(\)\{", r"exec\s+exec",
+    r"\>\s*/etc/", r"\>\s*/var/", r"\>\s*/root/",
+    r"shutdown", r"reboot", r"init\s+0", r"init\s+6",
+    r"kill\s+-9\s+1", r"killall",
+    r"wget\s+http", r"curl\s+http.*>.*\.sh",
+]
+
+
+def _is_command_safe(cmd: str) -> bool:
+    """Check if a command is safe to execute.
+    
+    Args:
+        cmd: Command to validate.
+        
+    Returns:
+        True if command is safe, False if dangerous patterns found.
+    """
+    cmd_lower = cmd.lower()
+    for pattern in BLOCKED_PATTERNS:
+        if re.search(pattern, cmd_lower, re.IGNORECASE):
+            logger.warning(f"Blocked dangerous pattern: {pattern} in command: {cmd}")
+            return False
+    return True
 
 
 def suggest_remediations(vuln_recs: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -64,7 +99,7 @@ def suggest_remediations(vuln_recs: Dict[str, List[str]]) -> Dict[str, List[str]
     return actions
 
 
-def apply_remediation_step(step: str, simulate: bool = True) -> None:
+def apply_remediation_step(step: str, simulate: bool = True) -> Optional[str]:
     """Apply a remediation step by executing shell commands when safe.
 
     Args:
@@ -72,23 +107,63 @@ def apply_remediation_step(step: str, simulate: bool = True) -> None:
         simulate: If True, print the command instead of executing it.  If
             False, attempt to run the command using ``subprocess``.
 
+    Returns:
+        Error message if blocked, None if success.
+
     Note:
         Only very simple commands are supported.  Multi‑step procedures
         (editing files, updating multiple services) should be carried out
         manually or via a configuration management tool.  When simulate=True
         the function just prints the step to stdout.
+        
+    Security:
+        Implements command blocklisting to prevent command injection attacks.
+        Dangerous patterns like rm -rf, fork bombs, and file overwrites
+        are blocked regardless of simulate mode.
     """
+    # Always verify security, even in simulation mode
+    if not _is_command_safe(step):
+        error_msg = f"BLOCKED: Command contains dangerous pattern"
+        print(f"❌ {error_msg}: {step}")
+        logger.error(f"Blocked remediation attempt: {step}")
+        return error_msg
+    
     if simulate:
         print(f"[SIMULATION] {step}")
-        return
-    # For demonstration, attempt to run commands separated by '&&' one by one.
+        return None
+    
+    # Execute commands safely
     commands = [cmd.strip() for cmd in step.split('&&')]
+    
     for cmd in commands:
+        if not _is_command_safe(cmd):
+            print(f"❌ BLOCKED: Dangerous command: {cmd}")
+            continue
+            
         try:
-            subprocess.run(cmd, shell=True, check=True)
-            print(f"Executed: {cmd}")
+            # Use timeout to prevent indefinite execution
+            result = subprocess.run(
+                cmd, 
+                shell=True, 
+                check=True, 
+                capture_output=True, 
+                text=True, 
+                timeout=30
+            )
+            print(f"✓ Executed: {cmd}")
+            if result.stdout:
+                logger.info(f"Output: {result.stdout}")
+        except subprocess.TimeoutExpired:
+            print(f"⚠️ Timeout executing: {cmd}")
+            logger.warning(f"Command timeout: {cmd}")
         except subprocess.CalledProcessError as exc:
-            print(f"Failed to execute '{cmd}': {exc}")
+            print(f"⚠️ Failed to execute '{cmd}': {exc}")
+            logger.warning(f"Command failed: {cmd} - {exc}")
+        except Exception as exc:
+            print(f"❌ Error executing '{cmd}': {exc}")
+            logger.error(f"Command error: {cmd} - {exc}")
+    
+    return None
 
 
 __all__ = ["suggest_remediations", "apply_remediation_step"]

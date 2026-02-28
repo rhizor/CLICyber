@@ -92,7 +92,8 @@ def send_slack_alert(message: str, webhook_url: Optional[str] = None) -> Dict[st
         return {"error": "SLACK_WEBHOOK_URL not configured"}
     payload = {"text": message}
     try:
-        resp = requests.post(url, json=payload, timeout=10)
+        # Verify SSL certificates by default for security
+        resp = requests.post(url, json=payload, timeout=10, verify=True)
         resp.raise_for_status()
         return {"success": "Message sent to Slack"}
     except Exception as exc:
@@ -117,7 +118,8 @@ def send_telegram_alert(message: str, token: Optional[str] = None, chat_id: Opti
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat, "text": message}
     try:
-        resp = requests.post(url, json=payload, timeout=10)
+        # Verify SSL certificates by default for security
+        resp = requests.post(url, json=payload, timeout=10, verify=True)
         resp.raise_for_status()
         return {"success": "Message sent to Telegram"}
     except Exception as exc:
