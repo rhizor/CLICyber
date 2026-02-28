@@ -30,7 +30,7 @@ cd CLICyber
 pip install typer requests fastapi uvicorn
 
 # Ejecutar
-PYTHONPATH=/home/ubuntu/.openclaw/workspace/clicyber python3 -m cybercliSimplified.cli --help
+PYTHONPATH=/home/ubuntu/.openclaw/workspace/clicyber python3 -m cybercli.cli --help
 ```
 
 ## 📦 Uso
@@ -38,15 +38,33 @@ PYTHONPATH=/home/ubuntu/.openclaw/workspace/clicyber python3 -m cybercliSimplifi
 ### Escaneo de Red
 
 ```bash
-# Escanear puertos comunes
-python3 -m cybercliSimplified.cli scan network 192.168.1.1
+# Escanear por categoría
+python3 -m cybercli.cli scan network 192.168.1.1 --category web      # Puertos web
+python3 -m cybercli.cli scan network 192.168.1.1 --category db         # Bases de datos
+python3 -m cybercli.cli scan network 192.168.1.1 --category mail        # Correo
+python3 -m cybercli.cli scan network 192.168.1.1 --category remote     # Acceso remoto
+python3 -m cybercli.cli scan network 192.168.1.1 --category file      # Archivos
+python3 -m cybercli.cli scan network 192.168.1.1 --category dns        # DNS
+python3 -m cybercli.cli scan network 192.168.1.1 --category all        # Todos
 
-# Escanear top 20 puertos
-python3 -m cybercliSimplified.cli scan network 192.168.1.1 --top-ports 20
+# Escanear puertos comunes (default)
+python3 -m cybercli.cli scan network 192.168.1.1
 
-# Escanear red completa
-python3 -m cybercliSimplified.cli scan network 192.168.1.0/24 --top-ports 10
+# Escanear top N puertos
+python3 -m cybercli.cli scan network 192.168.1.1 --top-ports 20
 ```
+
+### Categorías disponibles
+
+| Categoría | Puertos |
+|-----------|---------|
+| `web` | 80, 443, 8080, 8443, 3000, 5000, 8000, 9000... |
+| `db` | 3306, 5432, 27017, 6379, 1433, 1521, 9200... |
+| `mail` | 25, 110, 143, 465, 587, 993, 995... |
+| `remote` | 22, 23, 3389, 5900, 2222, 22222... |
+| `file` | 20, 21, 69, 115, 139, 445, 2049... |
+| `dns` | 53, 853, 5353, 5060, 5061... |
+| `all` | Todos los anteriores (~63 puertos) |
 
 ### Hardening
 

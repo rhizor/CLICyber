@@ -53,16 +53,58 @@ def scan_network_cmd(
     target: str = typer.Argument(..., help="Target IP or network (e.g., 192.168.1.0/24)"),
     top_ports: int = typer.Option(20, "--top-ports", help="Number of top ports to scan"),
     timeout: int = typer.Option(2, "--timeout", help="Timeout per port in seconds"),
+    category: str = typer.Option(None, "--category", help="Port category: web, db, mail, remote, all"),
 ):
     """Perform a network port scan."""
-    # Common ports list
+    # Port categories
+    PORT_CATEGORIES = {
+        "web": [
+            80, 443, 8080, 8443, 8000, 8888, 9000, 9090, 3000, 5000,
+            8008, 8043, 8888, 9443, 10443, 17001
+        ],
+        "db": [
+            3306, 5432, 27017, 6379, 1433, 1521, 5000, 9200, 9300,
+            5984, 5432, 3307, 27018, 27019, 28017
+        ],
+        "mail": [
+            25, 110, 143, 465, 587, 993, 995, 2525, 2526, 25025
+        ],
+        "remote": [
+            22, 23, 3389, 5900, 5901, 2222, 22222, 5522, 9922
+        ],
+        "file": [
+            20, 21, 69, 115, 139, 445, 2049, 10000, 11000, 49152
+        ],
+        "dns": [
+            53, 853, 5353, 5050, 5060, 5061
+        ],
+        "all": []  # Will be filled with all categories
+    }
+    
+    # Add all categories to "all"
+    PORT_CATEGORIES["all"] = list(set(
+        port for ports in PORT_CATEGORIES.values() for port in ports
+    ))
+    
+    # Common ports (default fallback)
     common_ports = [
         21, 22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 445, 993, 995,
         1723, 3306, 3389, 5900, 8080, 8443,
     ]
-    ports = common_ports[:top_ports] if top_ports <= len(common_ports) else common_ports
     
-    typer.echo(f"🔍 Scanning {target} (top {top_ports} ports)...")
+    # Determine ports to scan
+    if category:
+        category = category.lower()
+        if category not in PORT_CATEGORIES:
+            typer.echo(f"❌ Unknown category: {category}")
+            typer.echo(f"   Available: {', '.join(PORT_CATEGORIES.keys())}")
+            raise typer.Exit(1)
+        ports = PORT_CATEGORIES[category]
+        typer.echo(f"🔍 Scanning {target} (category: {category}, {len(ports)} ports)...")
+    else:
+        ports = common_ports[:top_ports] if top_ports <= len(common_ports) else common_ports
+        typer.echo(f"🔍 Scanning {target} (top {len(ports)} ports)...")
+    
     results = scan_network(target, ports, timeout=timeout)
     
     for host, ports in results.items():
