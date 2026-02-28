@@ -2,33 +2,21 @@
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
-# Project metadata for packaging. The main package is cybercli, which provides
-# an interactive CLI for security operations inspired by the CyberAgent project.
-
 [project]
 name = "cybercli"
-version = "0.1.0"
-description = "Interactive CLI for CyberAgent-inspired security operations with ISO 27001 compliance checks"
+version = "0.2.0"
+description = "Simplified Security CLI - Network scanning, hardening, and compliance"
 requires-python = ">=3.8"
 authors = [ { name = "CyberAgent CLI Team", email = "info@example.com" } ]
 license = { text = "MIT" }
 readme = "README.md"
 
-# Define runtime dependencies.  These packages provide HTTP requests, machine
-# learning algorithms, templating for reports and PDF generation, among other
-# utilities used by the CLI.
 dependencies = [
     "typer>=0.9",
     "requests>=2.31",
-    "scikit-learn>=1.3",
-    "joblib>=1.3",
-    "jinja2>=3.1",
-    "weasyprint>=60.1",
     "fastapi>=0.104",
     "uvicorn>=0.24",
-    "pandas>=2.0",
 ]
 
 [tool.setuptools]
-package-dir = {"" = "."}
 packages = ["cybercli"]
