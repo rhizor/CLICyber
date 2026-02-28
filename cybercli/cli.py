@@ -15,7 +15,7 @@ users while still offering concise options for experienced analysts.
 import json
 import os
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from pathlib import Path
 
 import typer
@@ -32,6 +32,10 @@ from .engines import reporting as _reporting  # noqa: F401
 from .engines import remediator as _remediator  # noqa: F401
 from .engines import alerting as _alerting  # noqa: F401
 from .engines import geoip as _geoip  # noqa: F401
+from .engines import cve_monitor as _cve_monitor  # noqa: F401
+from .engines import container_security as _container_security  # noqa: F401
+from .engines import file_integrity as _file_integrity  # noqa: F401
+from .engines import siem_integration as _siem_integration  # noqa: F401
 
 # Create the main Typer app
 app = typer.Typer(
@@ -1497,6 +1501,191 @@ def ai(
     response = prompt[::-1]
     typer.echo("📨 AI response (placeholder):")
     typer.echo(response)
+
+
+# ---------------------------------------------------------------------------
+# CVE Monitoring
+# ---------------------------------------------------------------------------
+cve_app = typer.Typer(help="CVE monitoring and vulnerability tracking.")
+
+
+@cve_app.command("search")
+def cve_search(
+    cve_id: str = typer.Argument(..., help="CVE ID to search (e.g., CVE-2024-1234)"),
+    detailed: bool = typer.Option(False, "--detailed", help="Show detailed information and remediation."),
+):
+    """Search for a specific CVE."""
+    from .engines import cve_monitor
+    cve_monitor.cve_search(cve_id, detailed=detailed)
+
+
+@cve_app.command("recent")
+def cve_recent(
+    days: int = typer.Option(7, "--days", help="Number of days to look back"),
+    limit: int = typer.Option(10, "--limit", help="Maximum number of CVEs to display"),
+):
+    """Show recent CVEs."""
+    from .engines import cve_monitor
+    cve_monitor.cve_recent(days=days, limit=limit)
+
+
+@cve_app.command("product")
+def cve_product(
+    product: str = typer.Argument(..., help="Product name (e.g., nginx, openssl)"),
+    vendor: str = typer.Option("apache", "--vendor", help="Vendor name"),
+):
+    """Search CVEs by product."""
+    from .engines import cve_monitor
+    monitor = cve_monitor.CVEMonitor()
+    cves = monitor.get_cves_by_product(product, vendor)
+    
+    if not cves:
+        print(f"❌ No CVEs found for {vendor}:{product}")
+        return
+    
+    print(f"\n📋 CVEs for {vendor}:{product} ({len(cves)} found):\n")
+    for cve in cves:
+        severity_emoji = "🔴" if cve.severity == "CRITICAL" else "🟠" if cve.severity == "HIGH" else "🟡"
+        print(f"  {severity_emoji} {cve.id} - {cve.severity} (CVSS: {cve.cvss_score})")
+
+
+app.add_typer(cve_app, name="cve")
+
+
+# ---------------------------------------------------------------------------
+# Container Security
+# ---------------------------------------------------------------------------
+container_app = typer.Typer(help="Docker and Kubernetes security scanning.")
+
+
+@container_app.command("docker")
+def container_docker():
+    """Scan Docker containers for security issues."""
+    from .engines import container_security
+    container_security.docker_scan()
+
+
+@container_app.command("kubernetes")
+def container_kubernetes():
+    """Scan Kubernetes cluster for security issues."""
+    from .engines import container_security
+    container_security.kubernetes_scan()
+
+
+app.add_typer(container_app, name="container")
+
+
+# ---------------------------------------------------------------------------
+# File Integrity Monitoring (FIM)
+# ---------------------------------------------------------------------------
+fim_app = typer.Typer(help="File integrity monitoring and change detection.")
+
+
+@fim_app.command("create-baseline")
+def fim_create(
+    paths: List[str] = typer.Argument(..., help="Paths to monitor"),
+    recursive: bool = typer.Option(True, "--recursive/--no-recursive", help="Recursively monitor subdirectories"),
+):
+    """Create a new integrity baseline."""
+    from .engines import file_integrity
+    file_integrity.fim_create_baseline(paths, recursive)
+
+
+@fim_app.command("check")
+def fim_check(
+    paths: Optional[List[str]] = typer.Argument(None, help="Paths to check (default: all baseline paths)"),
+):
+    """Check file integrity against baseline."""
+    from .engines import file_integrity
+    file_integrity.fim_check(paths)
+
+
+@fim_app.command("monitor")
+def fim_monitor(
+    paths: List[str] = typer.Argument(..., help="Paths to monitor continuously"),
+    interval: int = typer.Option(60, "--interval", help="Check interval in seconds"),
+):
+    """Monitor files continuously for changes."""
+    from .engines import file_integrity
+    file_integrity.fim_monitor(paths, interval)
+
+
+@fim_app.command("list")
+def fim_list():
+    """List baseline files."""
+    from .engines import file_integrity
+    file_integrity.fim_list_baseline()
+
+
+app.add_typer(fim_app, name="fim")
+
+
+# ---------------------------------------------------------------------------
+# SIEM Integration
+# ---------------------------------------------------------------------------
+siem_app = typer.Typer(help="SIEM platform integration (Splunk, ELK, Syslog).")
+
+
+@siem_app.command("send")
+def siem_send(
+    siem_type: str = typer.Argument(..., help="SIEM type: splunk, elk, syslog, webhook"),
+    message: str = typer.Argument(..., help="Message to send"),
+    severity: str = typer.Option("INFO", "--severity", help="Severity level"),
+    host: Optional[str] = typer.Option(None, "--host", help="SIEM host"),
+    port: Optional[int] = typer.Option(None, "--port", help="SIEM port"),
+    url: Optional[str] = typer.Option(None, "--url", help="Webhook URL"),
+):
+    """Send event to SIEM."""
+    from .engines import siem_integration
+    
+    kwargs = {}
+    if host:
+        kwargs["host"] = host
+    if port:
+        kwargs["port"] = port
+    if url:
+        kwargs["url"] = url
+    
+    siem_integration.siem_send(siem_type, message, severity, **kwargs)
+
+
+@siem_app.command("test")
+def siem_test(
+    siem_type: str = typer.Argument(..., help="SIEM type: splunk, elk, syslog, webhook"),
+    host: Optional[str] = typer.Option(None, "--host", help="SIEM host"),
+    port: Optional[int] = typer.Option(None, "--port", help="SIEM port"),
+    url: Optional[str] = typer.Option(None, "--url", help="Webhook URL"),
+):
+    """Test SIEM connection."""
+    from .engines import siem_integration
+    
+    kwargs = {}
+    if host:
+        kwargs["host"] = host
+    if port:
+        kwargs["port"] = port
+    if url:
+        kwargs["url"] = url
+    
+    siem_integration.siem_test(siem_type, **kwargs)
+
+
+app.add_typer(siem_app, name="siem")
+
+
+# ---------------------------------------------------------------------------
+# API Server
+# ---------------------------------------------------------------------------
+@app.command()
+def api(
+    host: str = typer.Option("0.0.0.0", "--host", help="API server host"),
+    port: int = typer.Option(8000, "--port", help="API server port"),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload"),
+):
+    """Start the CyberCLI REST API server."""
+    from . import api
+    typer.echo(f"🚀 Starting CyberCLI API server on {host}:{port}...")
+    api.start_server(host=host, port=port, reload=reload)
 
 
 if __name__ == "__main__":
